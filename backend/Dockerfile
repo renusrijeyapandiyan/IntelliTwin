@@ -1,12 +1,15 @@
 # build context: repository root (so ../shared test fixtures are available to `mvn test`)
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /src
+COPY backend/mvn-retry.sh /usr/local/bin/mvnr
+COPY backend/maven-mirror.xml /tmp/maven-mirror.xml
+RUN chmod +x /usr/local/bin/mvnr
 COPY backend/pom.xml backend/pom.xml
-RUN mvn -q -f backend/pom.xml dependency:go-offline
+RUN mvnr -q -f backend/pom.xml dependency:go-offline
 COPY shared shared
 COPY backend/src backend/src
 # unit tests run at image build time; a failing test fails the build
-RUN mvn -q -f backend/pom.xml package
+RUN mvnr -q -f backend/pom.xml package
 
 FROM eclipse-temurin:17-jre
 RUN useradd --system --uid 10001 app
