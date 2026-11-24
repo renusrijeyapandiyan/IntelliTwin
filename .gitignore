@@ -1,0 +1,16 @@
+.env
+node_modules/
+dist/
+target/
+__pycache__/
+*.pyc
+.pytest_cache/
+ai-service/model_registry/v*/
+ai-service/model_registry/registry.json
+ai-service/model_registry/registry.lock
+ai-service/training/data/
+env.ps1
+.env.*
+!.env.example
+*.log
+*.zip

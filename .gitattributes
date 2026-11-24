@@ -1,0 +1,6 @@
+# keep Unix line endings so containers do not break when the repo is edited on Windows
+* text=auto
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

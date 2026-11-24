@@ -1,0 +1,62 @@
+server:
+  port: ${PORT:8080}            # Render/Heroku-style hosts inject PORT
+
+spring:
+  application:
+    name: intellitwin-backend
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/intellitwin}
+      auto-index-creation: false     # indexes are created explicitly in MongoIndexes
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+# Secrets MUST come from environment variables (no defaults on purpose: the app refuses to start without them).
+intellitwin:
+  jwt:
+    secret: ${JWT_SECRET}                     # >= 32 characters
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:480}
+  ingest-api-key: ${INGEST_API_KEY}           # used by the sensor simulator
+  cors-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+  ai:
+    url: ${AI_SERVICE_URL:http://localhost:8000}
+    api-key: ${AI_API_KEY}
+    timeout-ms: ${AI_TIMEOUT_MS:2000}
+  simulator:
+    url: ${SIMULATOR_URL:http://localhost:8100}
+    control-token: ${CONTROL_TOKEN:}
+  twin:
+    stale-after-seconds: ${TWIN_STALE_AFTER_SECONDS:10}
+    history-size: ${TWIN_HISTORY_SIZE:300}
+    warmup-samples: ${TWIN_WARMUP_SAMPLES:120}   # must equal ai-service WARMUP_SAMPLES
+    max-future-seconds: 60
+  retention:
+    sensor-days: ${SENSOR_RETENTION_DAYS:3}
+    prediction-days: ${PREDICTION_RETENTION_DAYS:7}
+  seed:
+    admin-password: ${SEED_ADMIN_PASSWORD:}
+    engineer-password: ${SEED_ENGINEER_PASSWORD:}
+    operator-password: ${SEED_OPERATOR_PASSWORD:}
+  decision:                                   # R = w1*p + w2*anomaly + w3*trend  (weights are normalised)
+    probability-weight: 0.4
+    anomaly-weight: 0.4
+    trend-weight: 0.2
+    inspect-threshold: 0.30
+    schedule-threshold: 0.50
+    immediate-threshold: 0.75
+    ema-alpha: 0.2
+    hysteresis: 0.04
+    trend-window: 30
+    trend-scale: 1.5
+    probability-smoothing: 5
+    min-confidence: 0.2
+    disagreement: 0.6
+    reason-min-z: 2.0

@@ -1,0 +1,82 @@
+# IntelliTwin: full stack.  1) ./scripts/make-env.sh   2) docker compose up --build
+# Secrets are read from .env (never committed). Compose refuses to start if one is missing.
+name: intellitwin
+
+x-ai-env: &ai-key AI_API_KEY=${AI_API_KEY:?run ./scripts/make-env.sh first}
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ai-service:
+    build: { context: ., dockerfile: ai-service/Dockerfile }
+    restart: unless-stopped
+    environment:
+      - *ai-key
+      - MODEL_REGISTRY_DIR=/models
+    volumes: [model-registry:/models]
+    ports: ["127.0.0.1:8000:8000"]
+
+  backend:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    restart: unless-stopped
+    depends_on:
+      mongo: { condition: service_healthy }
+      ai-service: { condition: service_healthy }
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/intellitwin
+      - JWT_SECRET=${JWT_SECRET:?run ./scripts/make-env.sh first}
+      - INGEST_API_KEY=${INGEST_API_KEY:?run ./scripts/make-env.sh first}
+      - *ai-key
+      - AI_SERVICE_URL=http://ai-service:8000
+      - SIMULATOR_URL=http://simulator:8100
+      - CONTROL_TOKEN=${CONTROL_TOKEN:-}
+      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD:?run ./scripts/make-env.sh first}
+      - SEED_ENGINEER_PASSWORD=${SEED_ENGINEER_PASSWORD:?run ./scripts/make-env.sh first}
+      - SEED_OPERATOR_PASSWORD=${SEED_OPERATOR_PASSWORD:?run ./scripts/make-env.sh first}
+      - CORS_ORIGINS=http://localhost:3000
+    ports: ["127.0.0.1:8080:8080"]
+
+  simulator:
+    build: { context: ., dockerfile: simulator/Dockerfile }
+    restart: unless-stopped
+    depends_on:
+      backend: { condition: service_healthy }
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - INGEST_API_KEY=${INGEST_API_KEY:?run ./scripts/make-env.sh first}
+      - CONTROL_TOKEN=${CONTROL_TOKEN:-}
+      - SIM_SEED=${SIM_SEED:-42}
+      - SIM_INTERVAL=${SIM_INTERVAL:-1.0}
+
+  learning:
+    build: { context: ., dockerfile: ai-service/Dockerfile }
+    restart: unless-stopped
+    entrypoint: ["python", "-m", "learning.loop"]
+    healthcheck: { disable: true }     # the image's HEALTHCHECK probes the web API, which this container does not run
+    depends_on:
+      ai-service: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/intellitwin
+      - MODEL_REGISTRY_DIR=/models
+      - LEARN_INTERVAL_SECONDS=${LEARN_INTERVAL_SECONDS:-600}
+      - LEARN_LOOKBACK_HOURS=${LEARN_LOOKBACK_HOURS:-6}
+    volumes: [model-registry:/models]
+
+  frontend:
+    build: { context: ., dockerfile: frontend/Dockerfile }
+    restart: unless-stopped
+    depends_on: [backend]
+    ports: ["3000:80"]
+
+volumes:
+  mongo-data:
+  model-registry:
